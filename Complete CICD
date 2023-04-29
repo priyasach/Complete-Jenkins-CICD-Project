@@ -1,0 +1,251 @@
+In this article, we will be deploying a node.js application on an EC2 instance and we will create a CICD pipeline using Jenkins.
+
+Tools we will be using in the project:
+
+AWS-EC2
+
+GitHub
+
+Docker
+
+Jenkins
+
+What is CICD pipeline?
+CI/CD (Continuous Integration/Continuous Deployment) pipeline is a set of automated processes that helps to integrate code changes, build, test, and deploy applications continuously. The primary goal of a CI/CD pipeline is to enable fast and reliable delivery of changes to production.
+
+A typical CI/CD pipeline consists of several stages, including:
+
+Code Integration: In this stage, developers integrate their code changes into a shared repository.
+
+Build: In this stage, the CI system builds the code and runs any necessary tests.
+
+Test: In this stage, the code is tested using various testing techniques, including unit tests, integration tests, and end-to-end tests.
+
+Deployment: In this stage, the code is deployed to production or a staging environment.
+
+Monitoring: In this stage, the system monitors the deployed application for performance and stability.
+
+Task-01
+Setup an AWS EC2 Instance first
+
+Log in to an AWS account using a user with admin privileges and ensure your region is set to us-east-1, N. Virginia.
+
+Move to the EC2 console. Click Launch Instance.
+
+
+
+Install Jenkins on this server
+
+
+COPY
+
+COPY
+ sudo apt update
+ sudo apt install openjdk-11-jre
+ java -version
+ curl -fsSL https://pkg.jenkins.io/debian/jenkins.io-2023.key | sudo tee \
+   /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+ echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+   https://pkg.jenkins.io/debian binary/ | sudo tee \
+   /etc/apt/sources.list.d/jenkins.list > /dev/null
+ sudo apt-get update
+ sudo apt-get install jenkins
+Start Jenkins
+
+
+COPY
+
+COPY
+ sudo systemctl enable jenkins
+ sudo systemctl start jenkins
+ sudo systemctl status jenkins
+1)Fork this repository:
+
+
+
+Jenkins is Accessible -
+
+
+
+Enable port 8080 from the security group -
+
+
+
+2)Create a connection to your Jenkins job and your GitHub Repository via GitHub Integration.
+
+Before starting with the Jenkins configurations we need to add the public key so that we can create a bridge between Jenkins and Github for accessing the source code from the Github repo.
+
+Go to your EC2 instance and type command
+
+#ssh-keygen - It will create 2 keys. CD to .ssh and check the keys.
+
+
+
+Configuring GitHub:
+
+1)Go to your GitHub account settings.
+
+
+
+2)Go to SSH and GPG keys, Add public key that we created using ssh-keygen and select key-type Authentication key.
+
+
+COPY
+
+COPY
+cat id_rsa.pub
+Above command you will get Public key and add this public key in “Key” Section of “SSH & GPG Keys”
+
+
+
+Configuring Jenkins:
+
+1)Creating a new Freestyle Project for node.js application
+
+
+
+2)Select the GitHub project URL write your project GitHub URL
+
+3)Select the “Git” and provide the below credentials
+
+Click on ADD and for the “kind” label select from the drop down list for
+
+
+
+4)Now we will add the credentials so that jenkins can access the code from the Github. In Source Core Management
+
+Go to Add credentials
+
+
+
+5)Add private key which we created using ssh-keygen command.
+
+Provide Unique ID, Description and then paste the “Private key “ at last as “Paraphrase” and click on ADD
+
+
+
+
+
+6)Click on Add -> save it, Now we are all ready to Build the job now. Click on Build now. It will get build.
+
+
+
+Go to the instance and check if the repo is cloned there.
+
+
+
+8)Also, install nodejs and npm as per the developer's guidelines in the README file:
+
+sudo apt install nodejs : as the project is for nodejs application.
+
+sudo apt install npm : npm is a package manager for nodejs.
+
+sudo npm install : install the nodejs app on the current server only.
+
+node app.js : shows the app running on which port mapping only for the current server.
+
+After executing all these commands. check if you can access the URL . It is not accessible as we have not given access to the port 8000.
+
+
+
+9)Go to instance -> Security -> Edit inbound rules -> Add rule
+
+
+
+Save it.
+
+10)Now take public ip of the instance and port 8000 and you can access the application.
+
+
+
+11)Now we will dockerize the application so that it can be accessed anywhere by anyone.
+
+Go to instance -> install docker sudo apt installdocker.io
+
+Create your Dockerfile
+
+
+COPY
+
+COPY
+FROM node:12.2.0-alpine
+WORKDIR app
+COPY . .
+RUN npm install
+RUN npm run test
+EXPOSE 8000
+CMD ["node","app.js"]
+Now build the image using this Dockerfile.
+
+docker build . -t node-app
+
+
+COPY
+
+COPY
+sudo usermod -a -G docker $USER
+sudo reboot
+
+
+Docker builds successfully, Image (todo:latest) has been created successfully.
+
+Now we will create a container from this image.
+
+
+COPY
+
+COPY
+docker run -d --name node-todo-app -p 8000:8000 node-app:latest
+A container will be created after this.
+
+
+
+Try accessing the same using the public IP and port 8000.
+
+
+
+And It is accessible.
+
+Now we will automate this process by using Jenkins and adding the commands in the shell.
+
+
+
+Build is successsful. We can access the same on browser.
+
+
+
+Now all the processes that we were doing manually will be performed automatically as we did the automation.
+
+Now we will configure webhook so that every time there is any updation, or deletion on the repository the job should be automatically triggered and it should perform the upcoming processes.
+
+Kill the existing container first.
+
+docker kill 24806f87ce50
+
+Jenkins -> Manage Jenkins -> Manage Plugins -> Install github integration plugin
+
+
+
+Webhooks provide a way for notifications to be delivered to an external web server whenever certain actions occur on a repository or organization.
+
+Go to repository settings -> webhook -> Add webhook -> Payload URL add jenkins URL here -> (http://44.211.219.37:8080/github-webhook/)
+
+
+
+Content type -> application.json
+
+Add webhook.
+
+
+
+It has been added successfully.
+
+Go to jenkins -> configure Add Build Triggers for WebHook integration.
+
+
+
+Now just update something in the repo and your job will be triggered automatically.
+
+
+
+So the build is successful.
